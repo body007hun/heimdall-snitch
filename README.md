@@ -47,19 +47,19 @@ Optional:
 
 ## Install dependencies on Arch Linux
 
-```bash
+
 sudo pacman -S iproute2 lsof procps-ng tcpdump
 sudo pacman -S nethogs bpftrace
 
-RUN
+## RUN
 chmod +x heimdall-snitch.sh
 ./heimdall-snitch.sh
 
-Safety
+## Safety
 
 This tool is passive. It does not modify firewall rules and does not block connections.
 
-License
+## License
 
 MIT License
 
