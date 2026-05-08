@@ -5,6 +5,10 @@ CONFIG_DIR="${HOME}/.config/heimdall-snitch"
 ALIAS_FILE="${CONFIG_DIR}/aliases.tsv"
 TMP_FILE="$(mktemp)"
 
+OPENWRT_ENABLED=1
+OPENWRT_USER="root"
+OPENWRT_HOST="192.168.1.1"
+
 mkdir -p "$CONFIG_DIR"
 
 info() { printf '\033[1;34m[INFO]\033[0m %s\n' "$*"; }
@@ -127,6 +131,30 @@ collect_wireguard() {
   ' >> "$TMP_FILE"
 }
 
+collect_openwrt_dhcp() {
+  if [[ "${OPENWRT_ENABLED:-0}" -ne 1 ]]; then
+    return
+  fi
+
+  info "OpenWrt DHCP lease lista olvasása (${OPENWRT_USER}@${OPENWRT_HOST})"
+
+  if ! command -v ssh >/dev/null 2>&1; then
+    warn "ssh parancs nincs"
+    return
+  fi
+
+  ssh "${OPENWRT_USER}@${OPENWRT_HOST}" 'cat /tmp/dhcp.leases' | awk '
+    NF >= 4 {
+      ip=$3
+      name=$4
+
+      if (ip ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ && name != "*" && name != "") {
+        print ip "\t" name "\topenwrt-dhcp"
+      }
+    }
+  ' >> "$TMP_FILE"
+}
+
 write_alias_file() {
   info "Alias fájl írása: $ALIAS_FILE"
 
@@ -157,6 +185,7 @@ main() {
   collect_hosts
   collect_tailscale
   collect_wireguard
+  collect_openwrt_dhcp
 
   write_alias_file
   show_result
