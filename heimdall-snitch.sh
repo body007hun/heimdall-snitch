@@ -67,6 +67,36 @@ run_and_maybe_log() {
   fi
 }
 
+run_and_maybe_log_pretty() {
+  local slug="$1"
+  shift
+  local cmd="$*"
+
+  printf '\n'
+  info "Indítás: $cmd"
+
+  if [[ "$LOG_ENABLED" -eq 1 ]]; then
+    local logfile
+    logfile="$(log_file_for "$slug")"
+    info "Napló: $logfile"
+    printf '\n'
+    bash -c "$cmd" 2>&1 | tee -a "$logfile" | pretty_pager
+  else
+    printf '\n'
+    bash -c "$cmd" 2>&1 | pretty_pager
+  fi
+}
+
+pretty_pager() {
+  if need_cmd bat; then
+    bat --paging=always --style=plain --language=log
+  elif need_cmd less; then
+    less -R
+  else
+    cat
+  fi
+}
+
 # --- env helpers -------------------------------------------------------------
 
 get_tailscale_iface() {
@@ -171,8 +201,24 @@ Magyarázat:
 - -t: TCP
 - -p: processz információ
 - -n: nincs névfeloldás
+
+Megjelenítés:
+- ha van bat, szebb pagerben nyílik
+- kilépés: q
 EOF
-  run_and_maybe_log "live_tcp" "sudo ss -tpn"
+
+  printf '\n'
+  info "Indítás: sudo ss -tpn"
+
+  if [[ "$LOG_ENABLED" -eq 1 ]]; then
+    local logfile
+    logfile="$(log_file_for "live_tcp")"
+    info "Napló: $logfile"
+    sudo ss -tpn 2>&1 | tee -a "$logfile" | pretty_pager
+  else
+    sudo ss -tpn 2>&1 | pretty_pager
+  fi
+
   pause
 }
 
@@ -196,7 +242,7 @@ Magyarázat:
 - melyik processz melyik IP-re / portra csatlakozik
 - established TCP kapcsolatok
 EOF
-  run_and_maybe_log "lsof_established" "sudo lsof -iTCP -sTCP:ESTABLISHED -n -P"
+  run_and_maybe_log_pretty "lsof_established" "sudo lsof -iTCP -sTCP:ESTABLISHED -n -P"
   pause
 }
 
@@ -301,7 +347,7 @@ Magyarázat:
 - gyors képet ad arról, mely külső címek szerepelnek gyakran
 EOF
 
-  run_and_maybe_log "top_talkers" "sudo ss -tpn state established | awk 'NR>1 {print \$5}' | sed '/^\s* *$/d' | sort | uniq -c | sort -nr | head -20"
+  run_and_maybe_log_pretty "top_talkers" "sudo ss -tpn state established | awk 'NR>1 {print \$5}' | sed '/^\s* *$/d' | sort | uniq -c | sort -nr | head -20"
   pause
 }
 
@@ -314,7 +360,7 @@ Magyarázat:
 - gyorsabb áttekintés outbound irányban
 EOF
 
-  run_and_maybe_log "external_connections" "sudo ss -tpn state established | grep -Ev '127\\.0\\.0\\.1|\[::1\]|10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[0-1])\\.' || true"
+  run_and_maybe_log_pretty "external_connections" "sudo ss -tpn state established | grep -Ev '127\\.0\\.0\\.1|\[::1\]|10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[0-1])\\.' || true"
   pause
 }
 
@@ -349,7 +395,7 @@ Magyarázat:
 - hasznos gyors auditnak
 EOF
 
-  run_and_maybe_log "listening_ports" "sudo ss -ltnp"
+  run_and_maybe_log_pretty "listening_ports" "sudo ss -ltnp"
   pause
 }
 
@@ -431,7 +477,7 @@ EOF
 
   if [[ -d "$LOG_DIR" ]]; then
     printf '\nLétező logok:\n\n'
-    ls -lah "$LOG_DIR" 2>/dev/null || true
+    ls -lah "$LOG_DIR" 2>/dev/null | pretty_pager || true
   else
     printf '\nMég nincs log könyvtár létrehozva.\n'
   fi
